@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>시티 드라이버 3D - City Driver 3D (조향 수정 버전)</title>
+    <!-- Three.js 3D 그래픽 라이브러리 CDN 로드 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+        }
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #050508;
+            font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+        }
+
+        /* 공통 화면 레이어 UI */
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+            background: rgba(10, 10, 15, 0.9);
+            color: #fff;
+            transition: opacity 0.4s ease;
+        }
+
+        .hidden {
+            display: none !important;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* 시작화면 스타일 */
+        #start-screen h1 {
+            font-size: 3.2rem;
+            margin-bottom: 10px;
+            color: #ffcc00;
+            text-shadow: 0 0 15px rgba(255, 204, 0, 0.4);
+            letter-spacing: 3px;
+        }
+
+        .subtitle {
+            font-size: 1.1rem;
+            color: #bbb;
+            margin-bottom: 40px;
+            text-align: center;
+            line-height: 1.6;
+        }
+
+        .mode-container {
+            display: flex;
+            gap: 30px;
+        }
+
+        .mode-card {
+            background: #1e1e26;
+            border: 2px solid #333;
+            border-radius: 16px;
+            padding: 30px;
+            width: 290px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .mode-card:hover {
+            transform: translateY(-8px);
+            border-color: #ffcc00;
+            background: #252533;
+            box-shadow: 0 12px 24px rgba(255, 204, 0, 0.25);
+        }
+
+        .mode-card h2 {
+            margin-top: 0;
+            font-size: 1.8rem;
+        }
+        .mode-card.speedrun h2 { color: #ff4d4d; }
+        .mode-card.explore h2 { color: #00ff88; }
+
+        .mode-card p {
+            color: #aaa;
+            font-size: 0.95rem;
+            line-height: 1.5;
+            margin-bottom: 25px;
+        }
+
+        .btn {
+            background: #ffcc00;
+            color: #111;
+            border: none;
+            padding: 12px 24px;
+            font-weight: bold;
+            font-size: 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn:hover { background: #ffe066; }
+
+        /* 인게임 컨테이너 및 헤드업 디스플레이(HUD) */
+        #game-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 25px;
+            left: 25px;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            z-index: 5;
+        }
+
+        .ui-panel {
+            background: rgba(10, 10, 15, 0.85);
+            padding: 14px 22px;
+            border-radius: 10px;
+            border-left: 5px solid #ffcc00;
+            color: white;
+            font-size: 1.1rem;
+            font-weight: bold;
+            box-shadow: 0 6px 12px rgba(0,0,0,0.4);
+            letter-spacing: 0.5px;
+        }
+
+        #timer-panel.alert {
+            border-left-color: #ff4d4d;
+            animation: pulse-red 1s infinite;
+        }
+
+        @keyframes pulse-red {
+            0% { background: rgba(10, 10, 15, 0.85); }
+            50% { background: rgba(180, 20, 20, 0.85); }
+            100% { background: rgba(10, 10, 15, 0.85); }
+        }
+
+        /* 안내 및 상호작용 알림판 */
+        #msg-panel {
+            position: absolute;
+            bottom: 45px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.85);
+            color: #fff;
+            padding: 14px 35px;
+            border-radius: 40px;
+            font-size: 1.1rem;
+            pointer-events: none;
+            z-index: 5;
+            border: 1px solid #444;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+
+        /* 실시간 탑다운 미니맵 */
+        #minimap-container {
+            position: absolute;
+            top: 25px;
+            right: 25px;
+            width: 200px;
+            height: 200px;
+            background: rgba(5, 5, 10, 0.85);
+            border: 3px solid #444;
+            border-radius: 12px;
+            overflow: hidden;
+            z-index: 5;
+            box-shadow: 0 6px 12px rgba(0,0,0,0.4);
+        }
+        #minimap-canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        /* 하단 조작 가이드 단축키 */
+        #controls-guide {
+            position: absolute;
+            bottom: 25px;
+            left: 25px;
+            background: rgba(0,0,0,0.7);
+            color: #ccc;
+            padding: 12px 18px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            line-height: 1.5;
+            pointer-events: none;
+            border: 1px solid #333;
+        }
+
+        /* 결과 창 */
+        #result-screen h1 { font-size: 3.5rem; margin-bottom: 15px; }
+        #result-screen.win h1 { color: #00ff88; text-shadow: 0 0 20px rgba(0, 255, 136, 0.4); }
+        #result-screen.lose h1 { color: #ff4d4d; text-shadow: 0 0 20px rgba(255, 77, 77, 0.4); }
+        #result-screen p { font-size: 1.2rem; color: #ccc; margin-bottom: 35px; }
+    </style>
+</head>
+<body>
+
+    <!-- 시작화면 대기실 -->
+    <div id="start-screen" class="screen">
+        <h1>CITY RUNNER 3D</h1>
+        <div class="subtitle">
+            질서정연하게 통행하는 3D 도로망에서 자동차를 탈취하여 질주하세요.<br>
+            <b>[수정 완료] 좌/우 조향 방향 정상화 및 3인칭 후방 시점 카메라 고정</b>
+        </div>
+        
+        <div class="mode-container">
+            <div class="mode-card speedrun" onclick="startGame('speedrun')">
+                <h2>스피드런</h2>
+                <p>제한시간 <b>3분 (180초)</b> 내에<br>대각선 반대편 끝 광장의 깃발에 도달하십시오.</p>
+                <button class="btn">도전 시작</button>
+            </div>
+            <div class="mode-card explore" onclick="startGame('exploration')">
+                <h2>자유 탐험</h2>
+                <p>제한시간과 깃발이 사라집니다.<br>3D 도시를 자유롭게 누비다 Shift 키로 종료합니다.</p>
+                <button class="btn" style="background:#00ff88; color:#111;">탐험 시작</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 인게임 프레임 컨테이너 -->
+    <div id="game-container">
+        <!-- HUD 정보 레이어 -->
+        <div id="ui-layer">
+            <div id="mode-panel" class="ui-panel">모드: 로딩중</div>
+            <div id="timer-panel" class="ui-panel">남은 시간: --:--</div>
+            <div id="vehicle-panel" class="ui-panel">상태: 도보 이동 중</div>
+        </div>
+
+        <div id="minimap-container">
+            <canvas id="minimap-canvas"></canvas>
+        </div>
+
+        <div id="msg-panel">지나가는 차량에 가까이 가서 마우스 클릭 시 탑승합니다.</div>
+        
+        <div id="controls-guide">
+            <b>[인게임 3D 조작법]</b><br>
+            • 조작: 방향키 (↑ 가속 / ↓ 후진 및 감속 / ← 왼쪽 회전 / → 오른쪽 회전)<br>
+            • **카메라 시선은 캐릭터나 자동차의 후방을 항상 따라갑니다.**<br>
+            • 차량 탑승: 근접 차량 마우스 왼쪽 클릭<br>
+            • 차량 하차: Enter 키 / 탐험 종료: Shift 키
+        </div>
+    </div>
+
+    <!-- 결과 화면 팝업 -->
+    <div id="result-screen" class="screen hidden">
+        <h1 id="result-title">MISSION COMPLETE</h1>
+        <p id="result-desc">성공적으로 탈출 깃발을 확보했습니다.</p>
+        <button class="btn" onclick="resetToMenu()" style="padding:14px 35px; font-size:1.1rem;">메인 메뉴로 이동</button>
+    </div>
+
+    <script>
+        // --- 글로벌 환경 정의 변수 설정 ---
+        const MAP_SIZE = 3200;       
+        const BLOCK_SIZE = 360;      
+        const ROAD_WIDTH = 180;      
+        const STEP_SIZE = BLOCK_SIZE + ROAD_WIDTH;
+        
+        let gameMode = 'speedrun';
+        let isGameRunning = false;
+        let startTime = 0;
+        let gameDuration = 180 * 1000;
+        let timerInterval = null;
+
+        let scene, camera, renderer;
+        let worldGroup; 
+        let minimapCanvas, minimapCtx;
+
+        // 엔티티 구조체 모델링 정의
+        let player = {
+            x: 150,
+            z: 150,
+            angle: 0, // 라디안 단위 회전각
+            speed: 0,
+            maxWalkSpeed: 4.5,
+            isInsideVehicle: false,
+            currentVehicle: null,
+            mesh: null
+        };
+
+        let vehicles = [];
+        let policeCar = null;
+        let buildings = [];
+        let destinationFlag = { x: 3020, z: 3020, radius: 50, mesh: null };
+
+        const keys = {};
+        window.addEventListener('keydown', (e) => {
+            keys[e.code] = true;
+            if (e.code === 'Enter' && isGameRunning && player.isInsideVehicle) exitVehicle();
+            if ((e.code === 'ShiftLeft' || e.code === 'ShiftRight') && isGameRunning && gameMode === 'exploration') {
+                endGame(true, '자유 탐험 시뮬레이션을 정상적으로 마쳤습니다.');
+            }
+        });
+        window.addEventListener('keyup', (e) => { keys[e.code] = false; });
+
+        // 마우스 클릭 시 주위 자동차 탐색 탑승 구현
+        window.addEventListener('mousedown', (e) => {
+            if (!isGameRunning || player.isInsideVehicle) return;
+
+            let closestVehicle = null;
+            let minDistance = 140; 
+
+            vehicles.forEach(v => {
+                let dx = v.x - player.x;
+                let dz = v.z - player.z;
+                let dist = Math.sqrt(dx*dx + dz*dz);
+                if (dist < minDistance) {
+                    minDistance = dist;
+                    closestVehicle = v;
+                }
+            });
+
+            if (closestVehicle) {
+                enterVehicle(closestVehicle);
+            } else {
+                showTemporaryMessage("탑승 가능한 거리 구역 내에 차량이 식별되지 않습니다.", 2000);
+            }
+        });
+
+        window.addEventListener('resize', () => {
+            if (camera && renderer) {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            }
+        });
+
+        // --- 게임 초기 시작 및 구동 함수 ---
+        function startGame(mode) {
+            gameMode = mode;
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('result-screen').classList.add('hidden');
+            
+            document.getElementById('mode-panel').innerText = `모드: ${mode === 'speedrun' ? '스피드런 3D' : '자유 탐험 3D'}`;
+            if (mode === 'exploration') {
+                document.getElementById('timer-panel').innerText = "남은 시간: 무제한 (Shift로 해제)";
+                document.getElementById('timer-panel').classList.remove('alert');
+            }
+
+            minimapCanvas = document.getElementById('minimap-canvas');
+            minimapCanvas.width = 200;
+            minimapCanvas.height = 200;
+            minimapCtx = minimapCanvas.getContext('2d');
+
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color('#0b0b14');
+            scene.fog = new THREE.FogExp2('#0b0b14', 0.0018);
+
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 4000);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            
+            const container = document.getElementById('game-container');
+            const oldCanvas = container.querySelector('canvas:not(#minimap-canvas)');
+            if (oldCanvas) container.removeChild(oldCanvas);
+            container.appendChild(renderer.domElement);
+
+            worldGroup = new THREE.Group();
+            scene.add(worldGroup);
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.45);
+            scene.add(ambientLight);
+
+            const dirLight = new THREE.DirectionalLight(0xfff5e6, 0.85);
+            dirLight.position.set(300, 500, 200);
+            dirLight.castShadow = true;
+            scene.add(dirLight);
+
+            const hemiLight = new THREE.HemisphereLight(0x749ee3, 0x223344, 0.4);
+            scene.add(hemiLight);
+
+            player.x = 150;
+            player.z = 150;
+            player.angle = 0;
+            player.speed = 0;
+            player.isInsideVehicle = false;
+            player.currentVehicle = null;
+            document.getElementById('vehicle-panel').innerText = "상태: 도보 이동 중";
+            document.getElementById('vehicle-panel').style.borderLeftColor = "#ffcc00";
+
+            const pGeo = new THREE.CylinderGeometry(6, 6, 22, 12);
+            const pMat = new THREE.MeshStandardMaterial({ color: 0x00ff88, roughness: 0.4 });
+            player.mesh = new THREE.Mesh(pGeo, pMat);
+            player.mesh.position.set(player.x, 11, player.z); 
+            worldGroup.add(player.mesh);
+
+            build3DCityMap();
+
+            isGameRunning = true;
+            startTime = Date.now();
+
+            if (gameMode === 'speedrun') {
+                clearInterval(timerInterval);
+                timerInterval = setInterval(updateTimer, 250);
+            }
+
+            animate();
+            showTemporaryMessage("방향키 조작 수정 완료! 원하시는 대로 움직입니다.", 4500);
+        }
+
+        // --- 3D 도심 인프라 맵 구성 ---
+        function build3DCityMap() {
+            buildings = [];
+            vehicles = [];
+
+            const groundGeo = new THREE.PlaneGeometry(MAP_SIZE, MAP_SIZE);
+            const groundMat = new THREE.MeshStandardMaterial({ color: 0x1e1e24, roughness: 0.8 });
+            const ground = new THREE.Mesh(groundGeo, groundMat);
+            ground.rotation.x = -Math.PI / 2;
+            ground.position.set(MAP_SIZE/2, 0, MAP_SIZE/2);
+            worldGroup.add(ground);
+
+            for (let x = ROAD_WIDTH/2; x < MAP_SIZE; x += STEP_SIZE) {
+                const lineGeo = new THREE.PlaneGeometry(4, MAP_SIZE);
+                const lineMat = new THREE.MeshBasicMaterial({ color: 0xffcc00 });
+                const line = new THREE.Mesh(lineGeo, lineMat);
+                line.rotation.x = -Math.PI / 2;
+                line.position.set(x, 0.2, MAP_SIZE/2);
+                worldGroup.add(line);
+            }
+            for (let z = ROAD_WIDTH/2; z < MAP_SIZE; z += STEP_SIZE) {
+                const lineGeo = new THREE.PlaneGeometry(MAP_SIZE, 4);
+                const lineMat = new THREE.MeshBasicMaterial({ color: 0xffcc00 });
+                const line = new THREE.Mesh(lineGeo, lineMat);
+                line.rotation.x = -Math.PI / 2;
+                line.position.set(MAP_SIZE/2, 0.2, z);
+                worldGroup.add(line);
+            }
+
+            const colors = [0x2c2c38, 0x3a3a4c, 0x1f1f26, 0x444456, 0x181822];
+            
+            for (let x = ROAD_WIDTH; x < MAP_SIZE - 100; x += STEP_SIZE) {
+                for (let z = ROAD_WIDTH; z < MAP_SIZE - 100; z += STEP_SIZE) {
+                    if (x < 400 && z < 400) continue;
+                    if (x + BLOCK_SIZE > 2650 && z + BLOCK_SIZE > 2650) continue;
+
+                    const height = 120 + Math.random() * 220;
+                    const bGeo = new THREE.BoxGeometry(BLOCK_SIZE, height, BLOCK_SIZE);
+                    const bMat = new THREE.MeshStandardMaterial({
+                        color: colors[Math.floor(Math.random() * colors.length)],
+                        roughness: 0.5,
+                        metalness: 0.2
+                    });
+                    const buildingMesh = new THREE.Mesh(bGeo, bMat);
+                    buildingMesh.position.set(x + BLOCK_SIZE/2, height/2, z + BLOCK_SIZE/2);
+                    worldGroup.add(buildingMesh);
+
+                    buildings.push({
+                        minX: x, maxX: x + BLOCK_SIZE,
+                        minZ: z, maxZ: z + BLOCK_SIZE
+                    });
+
+                    if (Math.random() > 0.3) {
+                        const winGeo = new THREE.BoxGeometry(BLOCK_SIZE + 2, 8, height * 0.7);
+                        const winMat = new THREE.MeshBasicMaterial({ color: 0xfff2cc, transparent: true, opacity: 0.15 });
+                        const winDecoration = new THREE.Mesh(winGeo, winMat);
+                        winDecoration.position.copy(buildingMesh.position);
+                        worldGroup.add(winDecoration);
+                    }
+                }
+            }
+
+            const carColors = [0xff3344, 0x3388ff, 0x00ff88, 0xffaa00, 0xffffff, 0x777788, 0x442266];
+            let roadLinesX = [];
+            let roadLinesZ = [];
+            for (let pos = ROAD_WIDTH/2; pos < MAP_SIZE; pos += STEP_SIZE) {
+                roadLinesX.push(pos);
+                roadLinesZ.push(pos);
+            }
+
+            // 일반 인공지능 주행 차량 생성
+            for (let i = 0; i < 55; i++) {
+                const isHorizontal = Math.random() > 0.5;
+                let cx, cz, angle, laneOffset = 42; 
+
+                if (isHorizontal) {
+                    const lineZ = roadLinesZ[Math.floor(Math.random() * roadLinesZ.length)];
+                    const direction = Math.random() > 0.5 ? 1 : -1;
+                    cx = Math.random() * MAP_SIZE;
+                    cz = lineZ + (direction * laneOffset);
+                    angle = direction === 1 ? 0 : Math.PI;
+
+                    vehicles.push({
+                        x: cx, z: cz, angle: angle, speed: 2.2 + Math.random() * 1.5,
+                        baseSpeed: 2.2, type: 'civilian', isHorizontal: true, dirSign: direction, laneRef: lineZ,
+                        color: carColors[Math.floor(Math.random() * carColors.length)],
+                        width: 26, length: 50, mesh: null
+                    });
+                } else {
+                    const lineX = roadLinesX[Math.floor(Math.random() * roadLinesX.length)];
+                    const direction = Math.random() > 0.5 ? 1 : -1;
+                    cx = lineX - (direction * laneOffset); 
+                    cz = Math.random() * MAP_SIZE;
+                    angle = direction === 1 ? Math.PI / 2 : -Math.PI / 2;
+
+                    vehicles.push({
+                        x: cx, z: cz, angle: angle, speed: 2.2 + Math.random() * 1.5,
+                        baseSpeed: 2.2, type: 'civilian', isHorizontal: false, dirSign: direction, laneRef: lineX,
+                        color: carColors[Math.floor(Math.random() * carColors.length)],
+                        width: 26, length: 50, mesh: null
+                    });
+                }
+            }
+
+            // 희귀 경찰차 오브젝트 생성 (맵 중앙 근처 배치)
+            policeCar = {
+                x: MAP_SIZE / 2,
+                z: MAP_SIZE / 2 + ROAD_WIDTH/2 + 42,
+                angle: 0, speed: 0, baseSpeed: 0,
+                type: 'police', isHorizontal: true, dirSign: 1, laneRef: MAP_SIZE / 2 + ROAD_WIDTH/2,
+                color: 0x0a2240, width: 28, length: 54, mesh: null, sirenTick: 0
+            };
+            vehicles.push(policeCar);
+
+            vehicles.forEach(v => {
+                const cGeo = new THREE.BoxGeometry(v.width, 14, v.length);
+                const cMat = new THREE.MeshStandardMaterial({ color: v.color, roughness: 0.3 });
+                const cMesh = new THREE.Mesh(cGeo, cMat);
+                cMesh.position.set(v.x, 7, v.z);
+                cMesh.rotation.y = -v.angle;
+                worldGroup.add(cMesh);
+                v.mesh = cMesh;
+
+                if (v.type === 'police') {
+                    const sGeo = new THREE.BoxGeometry(16, 4, 8);
+                    const sMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+                    const sMesh = new THREE.Mesh(sGeo, sMat);
+                    sMesh.position.set(0, 8, 0);
+                    cMesh.add(sMesh);
+                    v.sirenMesh = sMesh;
+                }
+            });
+
+            // 스피드런 목적지 깃발 지대 설정
+            const fGeo = new THREE.CylinderGeometry(destinationFlag.radius, destinationFlag.radius, 4, 24);
+            const fMat = new THREE.MeshStandardMaterial({ color: 0xff3344, transparent: true, opacity: 0.35 });
+            destinationFlag.mesh = new THREE.Mesh(fGeo, fMat);
+            destinationFlag.mesh.position.set(destinationFlag.x, 2, destinationFlag.z);
+            worldGroup.add(destinationFlag.mesh);
+
+            const poleGeo = new THREE.CylinderGeometry(2, 2, 80, 8);
+            const poleMat = new THREE.MeshStandardMaterial({ color: 0xdddddd });
+            const pole = new THREE.Mesh(poleGeo, poleMat);
+            pole.position.set(destinationFlag.x, 40, destinationFlag.z);
+            worldGroup.add(pole);
+            
+            if (gameMode !== 'speedrun') {
+                destinationFlag.mesh.visible = false;
+                pole.visible = false;
+            }
+        }
+
+        // --- 차량 탑승 및 하차 처리 ---
+        function enterVehicle(vehicle) {
+            player.isInsideVehicle = true;
+            player.currentVehicle = vehicle;
+            player.mesh.visible = false;
+            player.speed = vehicle.speed > 0 ? vehicle.speed : 2.0; 
+            player.angle = vehicle.angle;
+
+            const text = vehicle.type === 'police' ? "상태: 🚨 경찰차 강탈 성공! (주변 차량이 길을 비킵니다)" : "상태: 민간 차량 운전 중";
+            document.getElementById('vehicle-panel').innerText = text;
+            document.getElementById('vehicle-panel').style.borderLeftColor = vehicle.type === 'police' ? "#00aaff" : "#ffa500";
+            showTemporaryMessage("차량 탑승 완료! [Enter]를 누르면 하차합니다.", 3000);
+        }
+
+        function exitVehicle() {
+            if (!player.isInsideVehicle || !player.currentVehicle) return;
+            const v = player.currentVehicle;
+            
+            player.x = v.x - Math.sin(v.angle) * 45;
+            player.z = v.z + Math.cos(v.angle) * 45;
+            player.speed = 0;
+            v.speed = v.baseSpeed || 2.2;
+
+            player.isInsideVehicle = false;
+            player.currentVehicle = null;
+            player.mesh.visible = true;
+
+            document.getElementById('vehicle-panel').innerText = "상태: 도보 이동 중";
+            document.getElementById('vehicle-panel').style.borderLeftColor = "#ffcc00";
+            showTemporaryMessage("차량에서 내렸습니다.", 1500);
+        }
+
+        function updateTimer() {
+            if (!isGameRunning || gameMode !== 'speedrun') return;
+            const elapsed = Date.now() - startTime;
+            const remaining = Math.max(0, gameDuration - elapsed);
+
+            const min = String(Math.floor(remaining / 60000)).padStart(2, '0');
+            const sec = String(Math.floor((remaining % 60000) / 1000)).padStart(2, '0');
+
+            const panel = document.getElementById('timer-panel');
+            panel.innerText = `남은 시간: ${min}:${sec}`;
+
+            if (remaining <= 20000) panel.classList.add('alert');
+
+            if (remaining <= 0) {
+                clearInterval(timerInterval);
+                endGame(false, "제한시간이 초과되어 도시 탈출에 실패했습니다.");
+            }
+        }
+
+        function showTemporaryMessage(text, delay) {
+            const panel = document.getElementById('msg-panel');
+            panel.innerText = text;
+            panel.style.opacity = "1";
+            clearTimeout(msgTimeout);
+            msgTimeout = setTimeout(() => { panel.style.opacity = "0.35"; }, delay);
+        }
+        let msgTimeout = null;
+
+        function endGame(isWin, description) {
+            isGameRunning = false;
+            clearInterval(timerInterval);
+            const screen = document.getElementById('result-screen');
+            screen.classList.remove('hidden', 'win', 'lose');
+            screen.classList.add(isWin ? 'win' : 'lose');
+            document.getElementById('result-title').innerText = isWin ? "MISSION ACCOMPLISHED" : "MISSION FAILED";
+            document.getElementById('result-desc').innerText = description;
+        }
+
+        function resetToMenu() {
+            document.getElementById('result-screen').classList.add('hidden');
+            document.getElementById('start-screen').classList.remove('hidden');
+            isGameRunning = false;
+            clearInterval(timerInterval);
+        }
+
+        // --- 메인 그래픽 렌더 루프 및 카메라 고정 시스템 ---
+        function animate() {
+            if (!isGameRunning) return;
+            requestAnimationFrame(animate);
+
+            // 1. 플레이어 조작 핸들링
+            handleControls();
+
+            // 2. 물리 및 건물 충돌 검사
+            handleCollisions();
+
+            // 3. AI 차량 및 회피 시스템 구동
+            simulateTrafficAI();
+
+            // 4. 캐릭터 및 자동차 최신 위치 반영
+            let cx = player.x;
+            let cz = player.z;
+            let cAngle = player.angle;
+
+            if (player.isInsideVehicle && player.currentVehicle) {
+                player.currentVehicle.x = player.x;
+                player.currentVehicle.z = player.z;
+                player.currentVehicle.angle = player.angle;
+                player.currentVehicle.mesh.position.set(player.x, 7, player.z);
+                player.currentVehicle.mesh.rotation.y = -player.angle;
+            } else {
+                player.mesh.position.set(player.x, 11, player.z);
+                player.mesh.rotation.y = -player.angle;
+            }
+
+            // 5. 카메라 시선 3인칭 후방 완전 고정화
+            const camDistance = 150; 
+            const camHeight = 85;   
+            
+            // 플레이어 회전각(cAngle)에 기반한 후방 좌표 위치 실시간 추적 산출
+            const camX = cx - Math.cos(cAngle) * camDistance;
+            const camZ = cz - Math.sin(cAngle) * camDistance;
+
+            camera.position.set(camX, camHeight, camZ);
+            camera.lookAt(cx, 18, cz);
+
+            // 6. 스피드런 목적지 도착 조건 체크
+            if (gameMode === 'speedrun') {
+                let fdx = player.x - destinationFlag.x;
+                let fdz = player.z - destinationFlag.z;
+                let fDist = Math.sqrt(fdx*fdx + fdz*fdz);
+                if (fDist < destinationFlag.radius + 15) {
+                    endGame(true, "축하합니다! 제한시간 내에 최종 안전 구역에 도달했습니다!");
+                }
+            }
+
+            // 7. 화면 드로우 및 미니맵 업데이트
+            renderer.render(scene, camera);
+            renderHUDMinimap();
+        }
+
+        // --- 키보드 입력에 따른 가속 및 조향 가이드 (좌우 반대 뒤집힘 수정) ---
+        function handleControls() {
+            if (player.isInsideVehicle && player.currentVehicle) {
+                const v = player.currentVehicle;
+                const maxCarSpeed = v.type === 'police' ? 9.5 : 7.2;
+
+                // 차량 모드 조향 (← 누르면 각도가 증가하여 왼쪽 회전, → 누르면 감소하여 오른쪽 회전)
+                const turnFactor = 0.04 * (Math.min(Math.abs(player.speed), 3.5) / 3.5);
+                if (keys['ArrowLeft']) player.angle += turnFactor;
+                if (keys['ArrowRight']) player.angle -= turnFactor;
+
+                if (keys['ArrowUp']) {
+                    player.speed = Math.min(player.speed + 0.12, maxCarSpeed);
+                } else if (keys['ArrowDown']) {
+                    player.speed = Math.max(player.speed - 0.09, -2.5);
+                } else {
+                    player.speed *= 0.975; 
+                }
+            } else {
+                // 도보 모드 조향 (← 누르면 왼쪽 회전, → 누르면 오른쪽 회전)
+                const turnSpeed = 0.05;
+                if (keys['ArrowLeft']) player.angle += turnSpeed;
+                if (keys['ArrowRight']) player.angle -= turnSpeed;
+
+                let dz = 0;
+                if (keys['ArrowUp']) dz = -player.maxWalkSpeed;
+                if (keys['ArrowDown']) dz = player.maxWalkSpeed;
+
+                if (dz !== 0) {
+                    player.x += Math.cos(player.angle) * (-dz * 0.9);
+                    player.z += Math.sin(player.angle) * (dz * 0.9);
+                    player.speed = Math.abs(dz);
+                } else {
+                    player.speed = 0;
+                }
+            }
+
+            // 차량 탑승 시의 좌표 최종 반영
+            if (player.isInsideVehicle) {
+                player.x += Math.cos(player.angle) * player.speed;
+                player.z += Math.sin(player.angle) * player.speed;
+            }
+        }
+
+        // --- 마천루 빌딩 벽면 충돌 체크 처리 ---
+        function handleCollisions() {
+            const buffer = 25;
+            if (player.x < buffer) player.x = buffer;
+            if (player.x > MAP_SIZE - buffer) player.x = MAP_SIZE - buffer;
+            if (player.z < buffer) player.z = buffer;
+            if (player.z > MAP_SIZE - buffer) player.z = MAP_SIZE - buffer;
+
+            const hitRadius = player.isInsideVehicle ? 16 : 8;
+
+            for (let b of buildings) {
+                if (player.x > b.minX - hitRadius && player.x < b.maxX + hitRadius &&
+                    player.z > b.minZ - hitRadius && player.z < b.maxZ + hitRadius) {
+                    
+                    const distToMinX = Math.abs(player.x - b.minX);
+                    const distToMaxX = Math.abs(player.x - b.maxX);
+                    const distToMinZ = Math.abs(player.z - b.minZ);
+                    const distToMaxZ = Math.abs(player.z - b.maxZ);
+                    const minGap = Math.min(distToMinX, distToMaxX, distToMinZ, distToMaxZ);
+
+                    if (minGap === distToMinX) player.x = b.minX - hitRadius;
+                    else if (minGap === distToMaxX) player.x = b.maxX + hitRadius;
+                    else if (minGap === distToMinZ) player.z = b.minZ - hitRadius;
+                    else player.z = b.maxZ + hitRadius;
+
+                    if (player.isInsideVehicle) player.speed *= -0.35; 
+                }
+            }
+        }
+
+        // --- 도시 차량 교통 AI 주행 및 경찰차 회피 구동 ---
+        function simulateTrafficAI() {
+            const isPoliceActive = (player.isInsideVehicle && player.currentVehicle && player.currentVehicle.type === 'police');
+
+            vehicles.forEach(v => {
+                if (player.isInsideVehicle && player.currentVehicle === v) return;
+
+                if (v.type === 'police') {
+                    v.sirenTick++;
+                    if (v.sirenTick % 16 === 0) {
+                        v.sirenMesh.material.color.setHex(v.sirenMesh.material.color.getHex() === 0xff0000 ? 0x0000ff : 0xff0000);
+                    }
+                }
+
+                let dx = v.x - player.x;
+                let dz = v.z - player.z;
+                let distToPlayer = Math.sqrt(dx*dx + dz*dz);
+
+                if (isPoliceActive && distToPlayer < 450 && v.type !== 'police') {
+                    const escapeX = dx / distToPlayer;
+                    const escapeZ = dz / distToPlayer;
+                    v.x += escapeX * 4.5; 
+                    v.z += escapeZ * 4.5;
+                    v.angle = Math.atan2(-escapeZ, escapeX);
+                    v.mesh.material.color.setHex(0xffaa00);
+                } else {
+                    if (v.mesh.material.color.getHex() === 0xffaa00) {
+                        v.mesh.material.color.setHex(v.color); 
+                    }
+
+                    if (v.isHorizontal) {
+                        v.x += v.speed * v.dirSign;
+                        v.z = v.laneRef + (v.dirSign * 42); 
+                        if (v.x > MAP_SIZE) v.x = 0;
+                        if (v.x < 0) v.x = MAP_SIZE;
+                    } else {
+                        v.z += v.speed * v.dirSign;
+                        v.x = v.laneRef - (v.dirSign * 42); 
+                        if (v.z > MAP_SIZE) v.z = 0;
+                        if (v.z < 0) v.z = MAP_SIZE;
+                    }
+                }
+
+                if (v.mesh) {
+                    v.mesh.position.set(v.x, 7, v.z);
+                    v.mesh.rotation.y = -v.angle;
+                }
+            });
+        }
+
+        // --- 상단 HUD 미니맵 웹 캔버스 2D 드로잉 ---
+        function renderHUDMinimap() {
+            if (!minimapCtx) return;
+
+            minimapCtx.fillStyle = 'rgba(12, 12, 20, 0.9)';
+            minimapCtx.fillRect(0, 0, 200, 200);
+
+            const scale = 200 / MAP_SIZE;
+
+            minimapCtx.fillStyle = '#222230';
+            for (let bx = ROAD_WIDTH; bx < MAP_SIZE - 100; bx += STEP_SIZE) {
+                for (let bz = ROAD_WIDTH; bz < MAP_SIZE - 100; bz += STEP_SIZE) {
+                    minimapCtx.fillRect(bx * scale, bz * scale, BLOCK_SIZE * scale, BLOCK_SIZE * scale);
+                }
+            }
+
+            if (policeCar) {
+                minimapCtx.fillStyle = (Math.floor(Date.now() / 200) % 2 === 0) ? '#00bbff' : '#ff3344';
+                minimapCtx.beginPath();
+                minimapCtx.arc(policeCar.x * scale, policeCar.z * scale, 3.5, 0, Math.PI * 2);
+                minimapCtx.fill();
+            }
+
+            if (gameMode === 'speedrun') {
+                minimapCtx.fillStyle = '#ff3344';
+                minimapCtx.beginPath();
+                minimapCtx.arc(destinationFlag.x * scale, destinationFlag.z * scale, 5, 0, Math.PI * 2);
+                minimapCtx.fill();
+            }
+
+            minimapCtx.fillStyle = '#00ff88';
+            minimapCtx.beginPath();
+            minimapCtx.arc(player.x * scale, player.z * scale, 4, 0, Math.PI * 2);
+            minimapCtx.fill();
+            
+            minimapCtx.fillStyle = '#ffffff';
+            minimapCtx.beginPath();
+            minimapCtx.arc(player.x * scale, player.z * scale, 1.5, 0, Math.PI * 2);
+            minimapCtx.fill();
+        }
+    </script>
+</body>
+</html>
