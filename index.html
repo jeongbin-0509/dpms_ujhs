@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>자리배치</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- 왼쪽 성별 설정 사이드바 -->
+    <div id="sidebar">
+        <h3>남학생 선택 (파란색)</h3>
+        <div id="gender-grid"></div>
+        <button id="gender-btn">남/여 설정 완료</button>
+    </div>
+
+    <!-- 오른쪽 메인 화면 -->
+    <div id="main-content">
+        <h2>학급 자리배치</h2>
+        
+        <!-- 배정 옵션 버튼 -->
+        <div id="option-container">
+            <button id="opt-same" class="opt-btn">동성끼리 배정</button>
+            <button id="opt-diff" class="opt-btn">이성끼리 배정</button>
+        </div>
+
+        <div id="t">교탁</div>
+        <p><button id="r">🎲 랜덤 배정</button></p>
+        <div id="room"></div>
+        
+        <!-- 하단 일괄공개 버튼 추가 -->
+        <p><button id="reveal-all-btn">👁️ 모든 자리 일괄 공개</button></p>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

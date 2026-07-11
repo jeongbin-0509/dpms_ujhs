@@ -1,0 +1,224 @@
+body {
+    font-family: Arial, sans-serif;
+    margin: 20px;
+    background: #f5f5f5;
+    text-align: center;
+    display: flex;
+    justify-content: center;
+    gap: 40px;
+}
+
+#sidebar {
+    width: 160px;
+    background: #fff;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 0 5px rgba(0,0,0,0.1);
+    text-align: left;
+}
+
+#sidebar h3 {
+    margin: 0 0 10px 0;
+    font-size: 16px;
+    text-align: center;
+}
+
+#gender-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    margin-bottom: 12px;
+}
+
+.gender-box {
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 6px 0;
+    text-align: center;
+    font-size: 12px;
+    cursor: pointer;
+    background: #fff;
+    user-select: none;
+}
+
+.gender-box.male {
+    background: #007bff;
+    color: #fff;
+    border-color: #0056b3;
+}
+
+#gender-btn {
+    width: 100%;
+    padding: 8px;
+    font-weight: bold;
+    background: #28a745;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+#main-content {
+    flex-grow: 1;
+    max-width: 600px;
+}
+
+#option-container {
+    margin-bottom: 15px;
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+}
+
+.opt-btn {
+    padding: 8px 16px;
+    font-size: 14px;
+    font-weight: bold;
+    background: #fff;
+    border: 2px solid #ccc;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.opt-btn.active {
+    background: #28a745;
+    color: #fff;
+    border-color: #1e7e34;
+}
+
+#t {
+    margin: auto;
+    width: 180px;
+    background: #444;
+    color: #fff;
+    padding: 8px;
+    border-radius: 6px;
+}
+
+#room {
+    display: grid;
+    grid-template-columns: repeat(3, max-content);
+    gap: 18px;
+    justify-content: center;
+    margin-top: 25px; /* 의자가 올라갈 공간 확보 */
+}
+
+.col {
+    display: grid;
+    gap: 20px; /* 행간 간격을 살짝 넓혀 의자 공간 배정 */
+}
+
+.pair {
+    display: flex;
+    gap: 6px;
+}
+
+/* 🪑 책상 모양으로 디자인 수정 */
+.seat {
+    width: 74px;
+    height: 64px; /* 높이를 살짝 줄여 직사각형 책상 비율로 변경 */
+    background: #e6b89c; /* 따뜻한 원목 책상 색상 */
+    border: 3px solid #b37d56; /* 책상 테두리 마감선 */
+    border-top: 6px solid #c28e6b; /* 책상 상판의 입체감을 주는 두꺼운 윗선 */
+    border-radius: 4px;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font: bold 22px Arial;
+    color: #3e2723; /* 가독성 좋은 짙은 갈색 글씨 */
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.3);
+    cursor: move;
+    margin-top: 12px; /* 가상 의자가 들어갈 위쪽 여백 */
+}
+
+/* 🪑 책상 위에 붙어있는 의자 등받이 효과 */
+.seat::before {
+    content: "";
+    position: absolute;
+    top: -14px; /* 책상 위쪽으로 배치 */
+    left: 50%;
+    transform: translateX(-50%);
+    width: 36px;
+    height: 10px;
+    background: #a1887f; /* 의자 등받이 색상 */
+    border: 2px solid #6d4c41;
+    border-bottom: none;
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+}
+
+/* 고정된 책상 스타일 */
+.seat.fixed {
+    background: #ff8a80; /* 부드러운 다홍빛 톤의 고정 책상 */
+    color: #fff;
+    border-color: #d32f2f;
+    border-top-color: #ffb2a9;
+}
+.seat.fixed::before {
+    background: #d32f2f;
+    border-color: #9a0007;
+}
+
+.pin {
+    position: absolute;
+    right: 2px;
+    bottom: 2px;
+    border: none;
+    border-radius: 50%;
+    width: 18px;
+    height: 18px;
+    font-size: 10px;
+    cursor: pointer;
+    z-index: 10;
+    background: rgba(255,255,255,0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+/* 검은색 가림막 스타일 */
+.blind {
+    position: absolute;
+    top: -6px; /* 두꺼워진 border-top까지 완벽히 가리도록 조정 */
+    left: -3px;
+    width: calc(100% + 6px);
+    height: calc(100% + 9px);
+    background: #2b2b2b; /* 고급스러운 다크 그레이 가림막 */
+    border: 2px solid #111;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #bbb;
+    font-size: 20px;
+    z-index: 5;
+    box-shadow: 0 3px 5px rgba(0,0,0,0.3);
+}
+
+.blind:hover {
+    background: #3a3a3a;
+    color: #fff;
+}
+
+/* 하단 일괄공개 버튼 스타일 */
+#reveal-all-btn {
+    margin-top: 25px;
+    padding: 12px 24px;
+    font-size: 16px;
+    font-weight: bold;
+    background: #17a2b8;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    box-shadow: 0 3px 6px rgba(0,0,0,0.1);
+    transition: background 0.2s;
+}
+
+#reveal-all-btn:hover {
+    background: #138496;
+}
