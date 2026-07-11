@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>대한민국 전수 고속도로망 지능형 통합 관제 플랫폼</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        :root {
+            --bg-color: #060913;
+            --panel-bg: #0d1122;
+            --border-color: #222943;
+            --text-light: #f3f4f6;
+            --cyan-glow: #00f0ff;
+            
+            --status-green: #10b981;
+            --status-yellow: #f59e0b;
+            --status-red: #ef4444;
+        }
+
+        body {
+            margin: 0; padding: 0;
+            font-family: 'Pretendard', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-light);
+            display: flex; height: 100vh; overflow: hidden;
+        }
+
+        #sidebar {
+            width: 430px; background: var(--panel-bg);
+            border-right: 1px solid var(--border-color);
+            display: flex; flex-direction: column; z-index: 1000;
+            box-shadow: 5px 0 25px rgba(0,0,0,0.7);
+        }
+
+        .header { padding: 20px; background: #04070f; border-bottom: 1px solid var(--border-color); }
+        .header h1 { margin: 0; font-size: 1.2rem; color: var(--cyan-glow); font-weight: 800; letter-spacing: 0.5px;}
+        
+        /* 🌤️ 1. 날씨 연동 모듈 */
+        .weather-zone {
+            padding: 12px 20px; background: #131931; border-bottom: 1px solid var(--border-color);
+            display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem;
+        }
+        .weather-badge { background: #1e293b; padding: 4px 8px; border-radius: 4px; border: 1px solid #334155; font-size: 0.8rem; }
+
+        /* ⏱️ 2. 시간대별 교통흐름 분석 타임슬라이더 */
+        .predict-box {
+            padding: 15px 20px; background: #161c32; border-bottom: 1px solid var(--border-color);
+        }
+        .slider-title { font-size: 0.85rem; font-weight: bold; color: var(--cyan-glow); margin-bottom: 8px; display: flex; justify-content: space-between;}
+        .timeline-slider { width: 100%; accent-color: var(--cyan-glow); cursor: pointer; }
+
+        /* 🚚 3. 차종별 분석 통계 모듈 */
+        .vehicle-analysis {
+            padding: 15px 20px; background: #090c1a; border-bottom: 1px solid var(--border-color);
+        }
+        .v-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 6px; }
+        .v-card { background: #11162a; border: 1px solid var(--border-color); padding: 8px; text-align: center; border-radius: 4px; }
+        .v-card div:first-child { font-size: 0.75rem; color: #9ca3af; }
+        .v-card div:last-child { font-size: 0.95rem; font-weight: bold; color: var(--cyan-glow); margin-top: 2px; }
+
+        .section-title { padding: 15px 20px 5px 20px; font-size: 0.8rem; font-weight: bold; color: #6b7280; text-transform: uppercase; }
+        #congestion-list { flex: 1; overflow-y: auto; padding: 0 15px 20px 15px; display: flex; flex-direction: column; gap: 8px; }
+        
+        .congestion-item {
+            background: #11162a; border: 1px solid var(--border-color);
+            padding: 10px 14px; border-radius: 6px; cursor: pointer; transition: all 0.2s;
+        }
+        .congestion-item:hover { border-color: var(--cyan-glow); background: #1a223f; }
+        .item-title { font-weight: bold; display: flex; justify-content: space-between; font-size: 0.85rem;}
+        .item-sub { font-size: 0.75rem; color: #9ca3af; margin-top: 3px; }
+
+        #map { flex: 1; height: 100vh; }
+
+        /* [삭제 금지] 동해 보정 패치 */
+        .east-sea-patch {
+            background: #0d1122 !important; border: 2px solid var(--cyan-glow) !important;
+            color: var(--cyan-glow) !important; font-weight: bold; text-align: center;
+            line-height: 36px; border-radius: 6px; font-size: 0.95rem; box-shadow: 0 0 15px rgba(0,240,255,0.4);
+            white-space: nowrap;
+        }
+
+        /* [삭제 금지] 고속도로 노선 밀착형 정적 사고 마커 */
+        .highway-accident-marker {
+            background: #ef4444 !important; border: 2px solid #ffffff !important;
+            border-radius: 4px !important; color: #ffffff !important; font-weight: bold !important;
+            font-size: 0.75rem !important; text-align: center !important; line-height: 18px !important;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="sidebar">
+        <div class="header">
+            <h1>🌐 ALL-EXPRESSWAY ANALYTICS</h1>
+            <div style="font-size: 0.75rem; color: #6b7280; margin-top: 4px;">전국 고속도로 대규모 통합 지능형 관제 시스템</div>
+        </div>
+
+        <!-- 🌤️ 1. 날씨 연동 모듈 계통 -->
+        <div class="weather-zone">
+            <span>⛅ 전국 기상 실시간 동기화</span>
+            <div style="display:flex; gap:6px;">
+                <span class="weather-badge" id="weather-info">중부: 맑음 (24°C)</span>
+                <span class="weather-badge" id="weather-danger" style="color:var(--status-yellow);">강원: 안개 주의</span>
+            </div>
+        </div>
+
+        <!-- ⏱️ 2. 시간대별 교통흐름 동적 추적 슬라이더 -->
+        <div class="predict-box">
+            <div class="slider-title">
+                <span>⏱️ 시간대별 흐름 및 예측 시뮬레이션</span>
+                <span id="time-display" style="color: #fff; font-weight: bold;">현재 상황 (Live)</span>
+            </div>
+            <input type="range" id="timeline" class="timeline-slider" min="0" max="3" value="0" oninput="changeTimeline(this.value)">
+            <div style="display: flex; justify-content: space-between; font-size: 0.72rem; color: #9ca3af; margin-top: 5px;">
+                <span>현재</span><span>+1시간 뒤</span><span>+3시간 뒤</span><span>명절 정체 피크</span>
+            </div>
+        </div>
+
+        <!-- 🚚 3. 실시간 차종별 분석 통계 피드 -->
+        <div class="vehicle-analysis">
+            <div style="font-size: 0.8rem; font-weight: bold; color: #9ca3af;">📈 관제 노선 내 실시간 통행 차종 분석</div>
+            <div class="v-grid">
+                <div class="v-card"><div>🚗 승용·SUV</div><div id="v-car">68.4%</div></div>
+                <div class="v-card"><div>🚚 대형 화물</div><div id="v-truck">22.1%</div></div>
+                <div class="v-card"><div>🚌 고속 버스</div><div id="v-bus">9.5%</div></div>
+            </div>
+        </div>
+
+        <div class="section-title">🚨 고속도로 정체 및 지체 링크 (종합)</div>
+        <div id="congestion-list"></div>
+    </div>
+
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        const map = L.map('map', { zoomControl: false }).setView([36.1, 127.7], 7);
+        L.control.zoom({ position: 'topright' }).addTo(map);
+
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: '&copy; CARTO' }).addTo(map);
+
+        // [보존] 동해 오표기 마스킹 패치
+        L.marker([37.65, 132.3], { icon: L.divIcon({ className: 'east-sea-patch', html: '동해 (East Sea)', iconSize: [150, 40], iconAnchor: [75, 20] }), interactive: false }).addTo(map);
+
+        // 🛣️ [확장] 대한민국 전수 고속도로 데이터베이스 (간선, 지선, 순환선 전수 구체화)
+        const highways = [
+            // 남북축 간선 및 지선 전체
+            { id: "gyeongbu_1", name: "경부고속도로 (부산-대구)", coords: [[35.242, 129.092], [35.539, 129.117], [35.845, 128.535]] },
+            { id: "gyeongbu_2", name: "경부고속도로 (대구-대전)", coords: [[35.845, 128.535], [36.126, 128.351], [36.354, 127.458]] },
+            { id: "gyeongbu_3", name: "경부고속도로 (대전-서울)", coords: [[36.354, 127.458], [36.784, 127.168], [37.185, 127.098], [37.462, 127.036]] },
+            { id: "seohaean_1", name: "서해안고속도로 (목포-군산)", coords: [[34.832, 126.438], [35.251, 126.488], [35.942, 126.749]] },
+            { id: "seohaean_2", name: "서해안고속도로 (군산-서울)", coords: [[35.942, 126.749], [36.837, 126.685], [37.442, 126.896]] },
+            { id: "honam_main", name: "호남고속도로 (순천-논산)", coords: [[34.975, 127.551], [35.159, 126.852], [36.185, 127.098]] },
+            { id: "honam_branch", name: "호남고속도로 지선 (논산-대전)", coords: [[36.185, 127.098], [36.251, 127.251], [36.354, 127.458]] },
+            { id: "nonsan_cheonan", name: "논산천안고속도로", coords: [[36.185, 127.098], [36.452, 127.112], [36.784, 127.168]] },
+            { id: "suncheon_wanju", name: "순천완주고속도로", coords: [[34.975, 127.551], [35.312, 127.452], [35.821, 127.121]] },
+            { id: "tongyeong_daejeon", name: "통영대전고속도로", coords: [[34.852, 128.412], [35.352, 127.812], [36.354, 127.458]] },
+            { id: "jungbu_line", name: "중부고속도로 (남이-하남)", coords: [[36.541, 127.411], [37.199, 127.428], [37.534, 127.189]] },
+            { id: "second_jungbu", name: "제2중부고속도로", coords: [[37.215, 127.412], [37.381, 127.311], [37.485, 127.225]] },
+            { id: "jungbunaeryuk_1", name: "중부내륙고속도로 (창원-상주)", coords: [[35.232, 128.511], [35.568, 128.375], [36.432, 128.211]] },
+            { id: "jungbunaeryuk_2", name: "중부내륙고속도로 (상주-양평)", coords: [[36.432, 128.211], [37.033, 127.876], [37.525, 127.501]] },
+            { id: "central_1", name: "중앙고속도로 (부산-대구)", coords: [[35.251, 129.082], [35.485, 128.751], [35.845, 128.535]] },
+            { id: "central_2", name: "중앙고속도로 (대구-춘천)", coords: [[35.845, 128.535], [36.812, 128.452], [37.351, 127.921], [37.881, 127.731]] },
+            { id: "donghae_line", name: "동해고속도로 (울산-속초)", coords: [[35.539, 129.311], [36.012, 129.352], [37.451, 129.152], [37.756, 128.841], [38.201, 128.591]] },
+            { id: "pyeongtaek_paju", name: "평택파주고속도로", coords: [[36.952, 126.931], [37.281, 126.962], [37.551, 126.812], [37.782, 126.781]] },
+
+            // 동서축 간선 및 지선 전체
+            { id: "yeongdong_1", name: "영동고속도로 (인천-원주)", coords: [[37.424, 126.749], [37.199, 127.428], [37.382, 127.917]] },
+            { id: "yeongdong_2", name: "영동고속도로 (원주-강릉)", coords: [[37.382, 127.917], [37.514, 128.461], [37.756, 128.841]] },
+            { id: "namhae_1", name: "남해고속도로 (순천-진주)", coords: [[34.975, 127.551], [35.143, 128.118]] },
+            { id: "namhae_2", name: "남해고속도로 (진주-부산)", coords: [[35.143, 128.118], [35.245, 128.431], [35.234, 128.812]] },
+            { id: "namhae_branch", name: "남해고속도로 제2지선", coords: [[35.245, 128.431], [35.161, 128.751], [35.112, 128.982]] },
+            { id: "gwangju_daegu", name: "광주대구고속도로", coords: [[35.159, 126.852], [35.512, 127.521], [35.845, 128.535]] },
+            { id: "muan_gwangju", name: "무안광주고속도로", coords: [[34.992, 126.471], [35.121, 126.652], [35.159, 126.852]] },
+            { id: "saemangeum_pohang", name: "익산포항고속도로", coords: [[35.945, 126.952], [35.812, 127.251], [35.651, 127.512]] },
+            { id: "seosan_yeongdeok", name: "서산영덕고속도로 (당진-청주)", coords: [[36.837, 126.685], [36.691, 126.952], [36.641, 127.481]] },
+            { id: "cheongju_yeongdeok", name: "서산영덕고속도로 (청주-영덕)", coords: [[36.641, 127.481], [36.412, 128.751], [36.401, 129.382]] },
+            { id: "seoul_yangyang", name: "서울양양고속도로", coords: [[37.552, 127.189], [37.751, 127.751], [37.812, 128.152], [38.081, 128.621]] },
+
+            // 순환고속도로 전체망
+            { id: "capital_circ", name: "수도권제1순환고속도로", coords: [[37.442, 126.896], [37.321, 127.102], [37.552, 127.211], [37.682, 127.051], [37.551, 126.781], [37.442, 126.896]] },
+            { id: "daejeon_circ", name: "대전남부순환고속도로", coords: [[36.281, 127.351], [36.271, 127.412], [36.354, 127.458]] },
+            { id: "gwangju_circ", name: "광주외곽순환고속도로", coords: [[35.111, 126.711], [35.221, 126.851], [35.281, 126.981]] },
+            { id: "daegu_circ", name: "대구외곽순환고속도로", coords: [[35.811, 128.451], [35.951, 128.581], [35.881, 128.781]] }
+        ];
+
+        // 🚨 [보존] 고속도로 노선 한정 정적 사고 데이터 (깜빡임 없음)
+        const highwayIncidents = [
+            { name: "경부고속도로 신갈 JC 부근", desc: "화물차 간 후미 추돌 사고 조치 중 (1, 2차로 차단)", coords: [37.271, 127.103] },
+            { name: "영동고속도로 대관령1터널 내부", desc: "승용차 고장 고립 여파로 후방 서행 유발", coords: [37.691, 128.762] },
+            { name: "서해안고속도로 행담도 휴게소 인근", desc: "진입로 병목 구간 차량 접촉사고 처리 중", coords: [36.951, 126.835] }
+        ];
+
+        let activeRoads = [];
+        let currentTimeIndex = 0;
+
+        // 고속도로 사고 스티커 배치
+        highwayIncidents.forEach(inc => {
+            L.marker(inc.coords, {
+                icon: L.divIcon({ className: 'highway-accident-marker', html: '사고', iconSize: [36, 20], iconAnchor: [18, 10] })
+            }).addTo(map).bindPopup(`
+                <b style="color:var(--status-red); font-size:0.9rem;">⚠️ 고속도로 돌발사고</b><br>
+                <span style="font-size:0.85rem; display:block; margin-top:4px;"><b>위치:</b> ${inc.name}<br><b>상황:</b> ${inc.desc}</span>
+            `);
+        });
+
+        // ⏱️ 시간대별 매트릭스 흐름 분석 연산 함수
+        function getPredictiveStatus(roadId, index) {
+            const heavyRoutes = ["gyeongbu_3", "yeongdong_1", "capital_circ", "seoul_yangyang", "seohaean_2"];
+            if (heavyRoutes.includes(roadId)) return ['yellow', 'red', 'red', 'red'][index];
+            const charSum = roadId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+            return ['green', 'yellow', 'red'][(charSum + index) % 3];
+        }
+
+        // 🌤️ 🚚 날씨 및 차종 비율 동적 시뮬레이션 인터페이스
+        function updateEnvironmentStats(index) {
+            const weatherForecasts = [
+                { main: "중부: 맑음 (24°C)", sub: "강원: 안개 주의" },
+                { main: "전국: 대체로 흐림", sub: "영동: 약한 비 시작" },
+                { main: "경기·충청: 국지성 호우", sub: "남부: 강풍 주의보" },
+                { main: "전국 기상이변 속출", sub: "통제 노선 확인 요망" }
+            ];
+            document.getElementById('weather-info').innerText = weatherForecasts[index].main;
+            document.getElementById('weather-danger').innerText = weatherForecasts[index].sub;
+
+            const vehicleForecasts = [
+                { car: "68.4%", truck: "22.1%", bus: "9.5%" },
+                { car: "62.1%", truck: "26.3%", bus: "11.6%" },
+                { car: "55.8%", truck: "31.2%", bus: "13.0%" },
+                { car: "82.4%", truck: "4.5%", bus: "13.1%" }
+            ];
+            document.getElementById('v-car').innerText = vehicleForecasts[index].car;
+            document.getElementById('v-truck').innerText = vehicleForecasts[index].truck;
+            document.getElementById('v-bus').innerText = vehicleForecasts[index].bus;
+        }
+
+        // 전체 전국망 고속도로 렌더링 코어 프로세서
+        function renderSystem() {
+            activeRoads.forEach(r => map.removeLayer(r));
+            activeRoads = [];
+
+            const listContainer = document.getElementById('congestion-list');
+            listContainer.innerHTML = '';
+
+            const COLORS = { green: 'var(--status-green)', yellow: 'var(--status-yellow)', red: 'var(--status-red)' };
+
+            highways.forEach(road => {
+                const status = getPredictiveStatus(road.id, currentTimeIndex);
+                const color = COLORS[status];
+
+                const poly = L.polyline(road.coords, { color: color, weight: 4.5, opacity: 0.85, lineJoin: 'round' }).addTo(map);
+                activeRoads.push(poly);
+
+                const statusText = status === 'red' ? '정체 혼잡' : (status === 'yellow' ? '서행 지체' : '원활 소통');
+                poly.bindPopup(`
+                    <div style="font-weight:bold; color:${color}; font-size:0.85rem; margin-bottom:2px;">${road.name}</div>
+                    <div style="font-size:0.8rem;"><b>현재 흐름:</b> ${statusText}</div>
+                `);
+
+                if (status === 'red' || status === 'yellow') {
+                    const item = document.createElement('div');
+                    item.className = 'congestion-item';
+                    item.innerHTML = `
+                        <div class="item-title">
+                            <span>${road.name}</span>
+                            <span style="color:${color};">● ${statusText}</span>
+                        </div>
+                        <div class="item-sub">실시간 교통량 분포 및 흐름 검지 정보 분석 중</div>
+                    `;
+
+                    item.addEventListener('click', () => {
+                        const mid = road.coords[Math.floor(road.coords.length / 2)];
+                        map.flyTo(mid, 9);
+                        setTimeout(() => poly.openPopup(mid), 500);
+                    });
+
+                    listContainer.appendChild(item);
+                }
+            });
+
+            updateEnvironmentStats(currentTimeIndex);
+        }
+
+        // 타임슬라이더 컨트롤
+        function changeTimeline(val) {
+            currentTimeIndex = parseInt(val);
+            const labels = ["현재 상황 (Live)", "1시간 뒤 예측 모델", "3시간 뒤 예측 모델", "명절 대수송 정체 피크"];
+            document.getElementById('time-display').innerText = labels[currentTimeIndex];
+            renderSystem();
+        }
+
+        renderSystem();
+    </script>
+</body>
+</html>

@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>로열 아레나 : 카드 배틀</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg-void:#0b0714;
+    --stone-dark:#231a34;
+    --stone-mid:#352548;
+    --river:#1c3a4a;
+    --gold:#d9ac4f;
+    --gold-dim:#8c6f34;
+    --player:#3fd7c4;
+    --player-dim:#1d6e64;
+    --enemy:#e35b52;
+    --enemy-dim:#7a2c27;
+    --parchment:#efe2c3;
+    --ink:#221a2c;
+    --muted:#a99bc0;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    min-height:100vh;
+    background:radial-gradient(ellipse at 50% -10%, #241634 0%, var(--bg-void) 55%);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-family:'Inter',sans-serif;
+    color:var(--parchment);
+    padding:20px;
+  }
+  .stage{
+    width:520px;
+    max-width:100%;
+  }
+  header{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    margin-bottom:10px;
+    padding:0 4px;
+  }
+  h1{
+    font-family:'Cinzel',serif;
+    font-weight:800;
+    font-size:22px;
+    letter-spacing:1px;
+    margin:0;
+    color:var(--gold);
+    text-shadow:0 2px 6px rgba(0,0,0,.6);
+  }
+  #timer{
+    font-family:'Cinzel',serif;
+    font-weight:600;
+    font-size:18px;
+    background:var(--stone-dark);
+    border:1px solid var(--gold-dim);
+    border-radius:6px;
+    padding:3px 10px;
+    color:var(--gold);
+  }
+  .arena-wrap{
+    position:relative;
+    border:3px solid var(--gold-dim);
+    border-radius:10px;
+    box-shadow:0 0 0 6px var(--stone-dark), 0 20px 40px rgba(0,0,0,.5);
+    overflow:hidden;
+  }
+  canvas{
+    display:block;
+    width:100%;
+    height:auto;
+    background:var(--stone-mid);
+    cursor:crosshair;
+  }
+  .overlay{
+    position:absolute;
+    inset:0;
+    background:rgba(10,6,16,.82);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    transition:opacity .3s;
+  }
+  .overlay.hidden{ opacity:0; pointer-events:none; }
+  .overlay-card{
+    text-align:center;
+    background:var(--stone-dark);
+    border:2px solid var(--gold);
+    border-radius:12px;
+    padding:28px 34px;
+  }
+  #overlay-title{
+    font-family:'Cinzel',serif;
+    font-size:28px;
+    margin:0 0 16px;
+    color:var(--gold);
+  }
+  #restart-btn{
+    font-family:'Inter',sans-serif;
+    font-weight:800;
+    font-size:14px;
+    background:var(--gold);
+    color:var(--ink);
+    border:none;
+    border-radius:8px;
+    padding:10px 22px;
+    cursor:pointer;
+    letter-spacing:.5px;
+  }
+  #restart-btn:hover{ filter:brightness(1.08); }
+  .hud{
+    margin-top:12px;
+    background:var(--stone-dark);
+    border:1px solid var(--gold-dim);
+    border-radius:10px;
+    padding:10px 12px;
+  }
+  .elixir-wrap{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-bottom:10px;
+  }
+  .elixir-label{
+    font-family:'Cinzel',serif;
+    font-size:12px;
+    color:var(--muted);
+    letter-spacing:1px;
+    width:52px;
+  }
+  .elixir-bar{
+    position:relative;
+    flex:1;
+    height:16px;
+    background:#160f1f;
+    border:1px solid var(--gold-dim);
+    border-radius:8px;
+    overflow:hidden;
+  }
+  .elixir-fill{
+    height:100%;
+    width:50%;
+    background:linear-gradient(90deg,#8a2fd4,#c084fc);
+    transition:width .2s linear;
+  }
+  #elixir-count{
+    position:absolute;
+    right:8px;
+    top:50%;
+    transform:translateY(-50%);
+    font-size:11px;
+    font-weight:800;
+    color:#fff;
+    text-shadow:0 1px 2px rgba(0,0,0,.8);
+  }
+  .hand{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:8px;
+  }
+  .card{
+    position:relative;
+    background:var(--parchment);
+    color:var(--ink);
+    border-radius:8px;
+    border:2px solid #b89b5e;
+    padding:8px 4px 6px;
+    text-align:center;
+    cursor:pointer;
+    user-select:none;
+    transition:transform .12s, box-shadow .12s;
+  }
+  .card:hover{ transform:translateY(-3px); }
+  .card.selected{
+    border-color:var(--gold);
+    box-shadow:0 0 0 3px rgba(217,172,79,.55);
+    transform:translateY(-5px);
+  }
+  .card.disabled{
+    opacity:.45;
+    cursor:not-allowed;
+    filter:grayscale(.4);
+  }
+  .card .icon{ font-size:24px; display:block; }
+  .card .name{ font-size:10px; font-weight:800; display:block; margin-top:2px; }
+  .card .cost{
+    position:absolute;
+    top:-8px;
+    left:-8px;
+    width:20px;
+    height:20px;
+    border-radius:50%;
+    background:#8a2fd4;
+    color:#fff;
+    font-size:11px;
+    font-weight:800;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    border:2px solid #efe2c3;
+  }
+  .hint{
+    text-align:center;
+    font-size:11px;
+    color:var(--muted);
+    margin-top:8px;
+  }
+</style>
+</head>
+<body>
+<div class="stage">
+  <header>
+    <h1>로열 아레나</h1>
+    <div id="timer">02:00</div>
+  </header>
+  <div class="arena-wrap">
+    <canvas id="arena" width="500" height="700"></canvas>
+    <div class="overlay hidden" id="overlay">
+      <div class="overlay-card">
+        <h2 id="overlay-title">승리!</h2>
+        <button id="restart-btn">다시 시작</button>
+      </div>
+    </div>
+  </div>
+  <div class="hud">
+    <div class="elixir-wrap">
+      <div class="elixir-label">엘릭서</div>
+      <div class="elixir-bar"><div class="elixir-fill" id="elixir-fill"></div><span id="elixir-count">5</span></div>
+    </div>
+    <div class="hand" id="hand"></div>
+  </div>
+  <div class="hint">카드를 선택한 뒤, 내 진영(하단 밝은 구역)을 클릭해 유닛을 배치하세요.</div>
+</div>
+
+<script>
+(function(){
+  const canvas = document.getElementById('arena');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  const RIVER_Y = 350;
+  const RIVER_HALF = 18;
+  const BRIDGE_XS = [135, 365];
+  const PLAYER_DEPLOY = {x0:20, x1:480, y0:390, y1:635};
+  const AGGRO_RANGE = 170;
+
+  const CARDS = {
+    knight:  {id:'knight', name:'기사', cost:3, hp:340, dmg:32, range:26, speed:42, atkInterval:1.0, count:1, radius:14, icon:'🛡️', buildingOnly:false},
+    archer:  {id:'archer', name:'궁수', cost:2, hp:90,  dmg:22, range:130,speed:46, atkInterval:1.1, count:1, radius:11, icon:'🏹', buildingOnly:false},
+    giant:   {id:'giant',  name:'거인', cost:5, hp:650, dmg:38, range:28, speed:26, atkInterval:1.3, count:1, radius:19, icon:'🗿', buildingOnly:true},
+    goblin:  {id:'goblin', name:'고블린',cost:2, hp:70,  dmg:16, range:18, speed:62, atkInterval:0.7, count:3, radius:9,  icon:'🔪', buildingOnly:false},
+  };
+  const CARD_ORDER = ['knight','archer','giant','goblin'];
+
+  let state = null;
+
+  function freshState(){
+    return {
+      running:true,
+      timeLeft:120,
+      selectedCard:null,
+      player:{
+        elixir:5, maxElixir:10, elixirRate:1/2.8,
+      },
+      ai:{
+        elixir:5, maxElixir:10, elixirRate:1/2.8, spawnCooldown:1.5,
+      },
+      towers:[
+        {owner:'player', kind:'king', x:250, y:660, hp:1400, maxHp:1400, dmg:45, range:120, interval:0.9, cooldown:0, w:64, h:54},
+        {owner:'enemy',  kind:'king', x:250, y:40,  hp:1400, maxHp:1400, dmg:45, range:120, interval:0.9, cooldown:0, w:64, h:54},
+        {owner:'player', kind:'princess', x:95,  y:520, hp:700, maxHp:700, dmg:32, range:115, interval:0.85, cooldown:0, w:46, h:40},
+        {owner:'player', kind:'princess', x:405, y:520, hp:700, maxHp:700, dmg:32, range:115, interval:0.85, cooldown:0, w:46, h:40},
+        {owner:'enemy',  kind:'princess', x:95,  y:180, hp:700, maxHp:700, dmg:32, range:115, interval:0.85, cooldown:0, w:46, h:40},
+        {owner:'enemy',  kind:'princess', x:405, y:180, hp:700, maxHp:700, dmg:32, range:115, interval:0.85, cooldown:0, w:46, h:40},
+      ],
+      units:[],
+      projectiles:[],
+      nextId:1,
+    };
+  }
+
+  function dist(ax,ay,bx,by){ return Math.hypot(ax-bx, ay-by); }
+
+  function spawnUnit(cardId, owner, x, y, jitter){
+    const c = CARDS[cardId];
+    const n = c.count || 1;
+    for(let i=0;i<n;i++){
+      const ox = x + (jitter ? (Math.random()-0.5)*50 : (i-(n-1)/2)*26);
+      const oy = y + (jitter ? (Math.random()-0.5)*20 : 0);
+      const fx = Math.min(475, Math.max(25, ox));
+      const bridgeX = BRIDGE_XS.reduce((a,b)=> Math.abs(b-fx)<Math.abs(a-fx) ? b : a, BRIDGE_XS[0]);
+      state.units.push({
+        id: state.nextId++,
+        owner, card:cardId,
+        x: fx,
+        y: Math.min(680, Math.max(20, oy)),
+        hp: c.hp, maxHp: c.hp,
+        dmg: c.dmg, range: c.range, speed: c.speed,
+        atkInterval: c.atkInterval, cooldown:0,
+        buildingOnly: c.buildingOnly,
+        radius: c.radius, icon: c.icon,
+        bridgeX,
+        retarget:0, targetId:null, targetIsTower:false,
+      });
+    }
+  }
+
+  function getRiverWaypoint(u, tx, ty){
+    const uSide = u.y < RIVER_Y ? 'top' : 'bottom';
+    const tSide = ty < RIVER_Y ? 'top' : 'bottom';
+    if(uSide === tSide) return {x:tx, y:ty};
+    const atBridgeX = Math.abs(u.x - u.bridgeX) < 16;
+    const inRiverBand = u.y > RIVER_Y - RIVER_HALF - 10 && u.y < RIVER_Y + RIVER_HALF + 10;
+    if(atBridgeX || inRiverBand) return {x:tx, y:ty};
+    const waypointY = uSide==='top' ? RIVER_Y - RIVER_HALF - 6 : RIVER_Y + RIVER_HALF + 6;
+    return {x:u.bridgeX, y:waypointY};
+  }
+
+  function spawnProjectile(attacker, target, dmg){
+    state.projectiles.push({
+      x:attacker.x, y:attacker.y,
+      target, dmg,
+      speed:280,
+      owner:attacker.owner,
+      color: attacker.owner==='player' ? '#8be9dd' : '#ff9c94',
+    });
+  }
+
+  function updateProjectiles(dt){
+    for(const p of state.projectiles){
+      if(!p.target || p.target.hp<=0){ p.dead=true; continue; }
+      const d = dist(p.x,p.y,p.target.x,p.target.y);
+      if(d<10){
+        p.target.hp -= p.dmg;
+        p.dead=true;
+        continue;
+      }
+      const nx=(p.target.x-p.x)/d, ny=(p.target.y-p.y)/d;
+      p.x += nx*p.speed*dt;
+      p.y += ny*p.speed*dt;
+    }
+    state.projectiles = state.projectiles.filter(p=>!p.dead);
+  }
+
+  function findTarget(u){
+    let best=null, bestD=Infinity;
+    for(const o of state.units){
+      if(o.owner===u.owner) continue;
+      if(u.buildingOnly) continue;
+      const d = dist(u.x,u.y,o.x,o.y);
+      if(d<AGGRO_RANGE && d<bestD){ best=o; bestD=d; }
+    }
+    if(best) return {id:best.id, isTower:false};
+    let bestTower=null, bestTd=Infinity;
+    for(const t of state.towers){
+      if(t.owner===u.owner || t.hp<=0) continue;
+      const d = dist(u.x,u.y,t.x,t.y);
+      if(d<bestTd){ bestTower=t; bestTd=d; }
+    }
+    return bestTower ? {id:null, isTower:true, tower:bestTower} : null;
+  }
+
+  function getEntityById(id, isTower){
+    if(isTower) return state.towers.find(t=>t.owner);
+    return state.units.find(x=>x.id===id);
+  }
+
+  function update(dt){
+    if(!state.running) return;
+
+    state.timeLeft -= dt;
+    if(state.timeLeft<=0){
+      state.timeLeft = 0;
+      const p = state.towers[0], e = state.towers[1];
+      endGame(p.hp/p.maxHp >= e.hp/e.maxHp ? 'win' : 'lose');
+      return;
+    }
+
+    state.player.elixir = Math.min(state.player.maxElixir, state.player.elixir + state.player.elixirRate*dt);
+    state.ai.elixir = Math.min(state.ai.maxElixir, state.ai.elixir + state.ai.elixirRate*dt);
+
+    state.ai.spawnCooldown -= dt;
+    if(state.ai.spawnCooldown<=0){
+      state.ai.spawnCooldown = 1.6 + Math.random()*1.2;
+      const affordable = CARD_ORDER.filter(id=>CARDS[id].cost<=state.ai.elixir);
+      if(affordable.length){
+        const pick = affordable[Math.floor(Math.random()*affordable.length)];
+        state.ai.elixir -= CARDS[pick].cost;
+        const lane = Math.random()<0.5 ? 130 : 370;
+        spawnUnit(pick, 'enemy', lane, 90, true);
+      }
+    }
+
+    for(const t of state.towers){
+      if(t.hp<=0) continue;
+      t.cooldown -= dt;
+      if(t.cooldown<=0){
+        let best=null,bestD=Infinity;
+        for(const o of state.units){
+          if(o.owner===t.owner) continue;
+          const d = dist(t.x,t.y,o.x,o.y);
+          if(d<t.range && d<bestD){ best=o; bestD=d; }
+        }
+        if(best){
+          spawnProjectile(t, best, t.dmg);
+          t.cooldown = t.interval;
+        }
+      }
+    }
+
+    for(const u of state.units){
+      if(u.hp<=0) continue;
+      u.retarget -= dt;
+      if(u.retarget<=0){
+        const tgt = findTarget(u);
+        u.retarget = 0.35;
+        if(tgt){
+          u.targetId = tgt.isTower ? null : tgt.id;
+          u.targetIsTower = !!tgt.isTower;
+          u.targetTowerRef = tgt.isTower ? tgt.tower : null;
+        } else {
+          u.targetId=null; u.targetIsTower=false; u.targetTowerRef=null;
+        }
+      }
+
+      let tx=null, ty=null, targetHpRef=null, targetDead=false;
+      if(u.targetIsTower && u.targetTowerRef){
+        if(u.targetTowerRef.hp<=0){ targetDead=true; }
+        else { tx=u.targetTowerRef.x; ty=u.targetTowerRef.y; }
+      } else if(u.targetId){
+        const o = state.units.find(x=>x.id===u.targetId);
+        if(!o || o.hp<=0){ targetDead=true; }
+        else { tx=o.x; ty=o.y; targetHpRef=o; }
+      } else {
+        targetDead=true;
+      }
+
+      if(targetDead){
+        const dir = u.owner==='player' ? -1 : 1;
+        ty = u.y + dir*40; tx = u.x;
+      }
+
+      const d = dist(u.x,u.y,tx,ty);
+      const reach = (targetHpRef ? u.range+targetHpRef.radius : u.range+ (u.targetIsTower?26:0));
+      if(tx!==null && d>reach){
+        const wp = getRiverWaypoint(u, tx, ty);
+        const dd = dist(u.x,u.y,wp.x,wp.y);
+        if(dd>0.01){
+          const nx=(wp.x-u.x)/dd, ny=(wp.y-u.y)/dd;
+          u.x += nx*u.speed*dt;
+          u.y += ny*u.speed*dt;
+          u.x = Math.min(495,Math.max(5,u.x));
+          u.y = Math.min(695,Math.max(5,u.y));
+        }
+      } else if(!targetDead) {
+        u.cooldown -= dt;
+        if(u.cooldown<=0){
+          u.cooldown = u.atkInterval;
+          const targetRef = u.targetIsTower ? u.targetTowerRef : targetHpRef;
+          if(targetRef){
+            if(u.range>40){
+              spawnProjectile(u, targetRef, u.dmg);
+            } else {
+              targetRef.hp -= u.dmg;
+            }
+          }
+        }
+      }
+    }
+
+    updateProjectiles(dt);
+
+    state.units = state.units.filter(u=>u.hp>0);
+
+    const p = state.towers[0], e = state.towers[1];
+    if(p.hp<=0){ endGame('lose'); }
+    else if(e.hp<=0){ endGame('win'); }
+  }
+
+  function endGame(result){
+    state.running=false;
+    const overlay = document.getElementById('overlay');
+    const title = document.getElementById('overlay-title');
+    title.textContent = result==='win' ? '승리! 🏆' : (result==='lose' ? '패배...' : '무승부');
+    overlay.classList.remove('hidden');
+  }
+
+  function drawTower(t){
+    const alive = t.hp>0;
+    const color = (t.owner==='player' ? getComputedStyle(document.documentElement).getPropertyValue('--player') : getComputedStyle(document.documentElement).getPropertyValue('--enemy')).trim();
+    const dim = (t.owner==='player' ? getComputedStyle(document.documentElement).getPropertyValue('--player-dim') : getComputedStyle(document.documentElement).getPropertyValue('--enemy-dim')).trim();
+
+    ctx.save();
+    if(!alive) ctx.globalAlpha = 0.35;
+    ctx.fillStyle = dim;
+    ctx.fillRect(t.x-t.w/2, t.y-t.h/2, t.w, t.h);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = t.kind==='king' ? 3 : 2.5;
+    ctx.strokeRect(t.x-t.w/2, t.y-t.h/2, t.w, t.h);
+    ctx.font = (t.kind==='king' ? '26px' : '19px') + ' serif';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillStyle = color;
+    const icon = t.kind==='king' ? (t.owner==='player'?'♜':'♛') : '🏹';
+    ctx.fillText(icon, t.x, t.y+2);
+    ctx.restore();
+
+    if(!alive){
+      ctx.fillStyle='rgba(255,255,255,.55)';
+      ctx.font='16px sans-serif';
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText('✕', t.x, t.y+2);
+      return;
+    }
+
+    const barW = t.kind==='king' ? 70 : 54, barH=8, bx=t.x-barW/2, by=t.y-t.h/2-18;
+    ctx.fillStyle='rgba(0,0,0,.5)';
+    ctx.fillRect(bx,by,barW,barH);
+    ctx.fillStyle = t.hp/t.maxHp>0.3 ? '#5fd45f' : '#e35b52';
+    ctx.fillRect(bx,by,barW*Math.max(0,t.hp/t.maxHp),barH);
+    ctx.strokeStyle='rgba(255,255,255,.4)'; ctx.lineWidth=1;
+    ctx.strokeRect(bx,by,barW,barH);
+
+    ctx.fillStyle='#fff';
+    ctx.font='9px Inter, sans-serif';
+    ctx.textAlign='center'; ctx.textBaseline='alphabetic';
+    ctx.fillText(Math.ceil(t.hp), t.x, by-4);
+  }
+
+  function drawUnit(u){
+    const color = u.owner==='player' ? '#3fd7c4' : '#e35b52';
+    ctx.beginPath();
+    ctx.arc(u.x,u.y,u.radius,0,Math.PI*2);
+    ctx.fillStyle = 'rgba(20,14,28,.9)';
+    ctx.fill();
+    ctx.lineWidth=2.5;
+    ctx.strokeStyle = color;
+    ctx.stroke();
+    ctx.font = (u.radius*1.3)+'px serif';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(u.icon, u.x, u.y+1);
+
+    const barW = u.radius*2.2, barH=4, bx=u.x-barW/2, by=u.y-u.radius-9;
+    ctx.fillStyle='rgba(0,0,0,.55)';
+    ctx.fillRect(bx,by,barW,barH);
+    ctx.fillStyle = u.hp/u.maxHp>0.3 ? '#5fd45f' : '#e35b52';
+    ctx.fillRect(bx,by,barW*Math.max(0,u.hp/u.maxHp),barH);
+
+    ctx.fillStyle='#fff';
+    ctx.font='8px Inter, sans-serif';
+    ctx.textAlign='center'; ctx.textBaseline='alphabetic';
+    ctx.fillText(Math.ceil(u.hp), u.x, by-3);
+  }
+
+  function drawProjectile(p){
+    ctx.beginPath();
+    ctx.arc(p.x,p.y,4,0,Math.PI*2);
+    ctx.fillStyle = p.color;
+    ctx.fill();
+    ctx.strokeStyle='rgba(255,255,255,.85)';
+    ctx.lineWidth=1;
+    ctx.stroke();
+  }
+
+  function render(){
+    ctx.clearRect(0,0,W,H);
+
+    const grad = ctx.createLinearGradient(0,0,0,H);
+    grad.addColorStop(0,'#3a2350');
+    grad.addColorStop(0.5,'#352548');
+    grad.addColorStop(1,'#2a3a4a');
+    ctx.fillStyle=grad;
+    ctx.fillRect(0,0,W,H);
+
+    for(let i=0;i<6;i++){
+      ctx.strokeStyle='rgba(255,255,255,.03)';
+      ctx.beginPath(); ctx.moveTo(0,i*120); ctx.lineTo(W,i*120); ctx.stroke();
+    }
+
+    ctx.fillStyle='#1c3a4a';
+    ctx.fillRect(0,RIVER_Y-14,W,28);
+    ctx.fillStyle='rgba(255,255,255,.08)';
+    for(let x=10;x<W;x+=26){ ctx.fillRect(x,RIVER_Y-3,14,6); }
+    ctx.fillStyle='#5a4326';
+    ctx.fillRect(115,RIVER_Y-16,40,32);
+    ctx.fillRect(345,RIVER_Y-16,40,32);
+
+    if(state.selectedCard){
+      const z = PLAYER_DEPLOY;
+      ctx.fillStyle='rgba(63,215,196,.14)';
+      ctx.fillRect(z.x0,z.y0,z.x1-z.x0,z.y1-z.y0);
+      ctx.strokeStyle='rgba(63,215,196,.5)';
+      ctx.setLineDash([6,6]);
+      ctx.strokeRect(z.x0,z.y0,z.x1-z.x0,z.y1-z.y0);
+      ctx.setLineDash([]);
+    }
+
+    for(const t of state.towers) drawTower(t);
+    for(const u of state.units) drawUnit(u);
+    for(const p of state.projectiles) drawProjectile(p);
+  }
+
+  function inDeployZone(x,y){
+    const z = PLAYER_DEPLOY;
+    return x>=z.x0 && x<=z.x1 && y>=z.y0 && y<=z.y1;
+  }
+
+  const handEls = {};
+
+  function buildHand(){
+    const hand = document.getElementById('hand');
+    hand.innerHTML='';
+    for(const id of CARD_ORDER){
+      const c = CARDS[id];
+      const div = document.createElement('div');
+      div.className = 'card';
+      div.innerHTML = `<div class="cost">${c.cost}</div><span class="icon">${c.icon}</span><span class="name">${c.name}</span>`;
+      div.addEventListener('click', ()=>{
+        if(!state.running) return;
+        if(state.player.elixir < c.cost) return;
+        state.selectedCard = (state.selectedCard===id) ? null : id;
+        refreshHand();
+      });
+      hand.appendChild(div);
+      handEls[id] = div;
+    }
+  }
+
+  // 카드 엘리먼트는 buildHand()에서 한 번만 만들고, 여기서는 클래스만 갱신한다.
+  // (매 프레임 DOM을 통째로 새로 만들면 탭하는 순간 엘리먼트가 교체돼 클릭이 씹힐 수 있음)
+  function refreshHand(){
+    for(const id of CARD_ORDER){
+      const c = CARDS[id];
+      const div = handEls[id];
+      if(!div) continue;
+      const affordable = state.player.elixir >= c.cost;
+      div.classList.toggle('selected', state.selectedCard===id);
+      div.classList.toggle('disabled', !affordable);
+    }
+  }
+
+  canvas.addEventListener('click', (ev)=>{
+    if(!state.running || !state.selectedCard) return;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = W/rect.width, scaleY = H/rect.height;
+    const x = (ev.clientX-rect.left)*scaleX;
+    const y = (ev.clientY-rect.top)*scaleY;
+    if(!inDeployZone(x,y)) return;
+    const c = CARDS[state.selectedCard];
+    if(state.player.elixir < c.cost) return;
+    state.player.elixir -= c.cost;
+    spawnUnit(state.selectedCard, 'player', x, y, true);
+    state.selectedCard = null;
+    refreshHand();
+  });
+
+  function updateHud(){
+    const fill = document.getElementById('elixir-fill');
+    const count = document.getElementById('elixir-count');
+    const pct = (state.player.elixir/state.player.maxElixir)*100;
+    fill.style.width = pct+'%';
+    count.textContent = Math.floor(state.player.elixir*10)/10;
+
+    const m = Math.floor(state.timeLeft/60);
+    const s = Math.floor(state.timeLeft%60);
+    document.getElementById('timer').textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  }
+
+  let last = performance.now();
+  let handTimer = 0;
+  function loop(now){
+    const dt = Math.min(0.05, (now-last)/1000);
+    last = now;
+    update(dt);
+    render();
+    updateHud();
+    handTimer += dt;
+    if(handTimer > 0.1){
+      handTimer = 0;
+      refreshHand();
+    }
+    requestAnimationFrame(loop);
+  }
+
+  function startGame(){
+    state = freshState();
+    document.getElementById('overlay').classList.add('hidden');
+    refreshHand();
+  }
+
+  document.getElementById('restart-btn').onclick = startGame;
+
+  buildHand();
+  startGame();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

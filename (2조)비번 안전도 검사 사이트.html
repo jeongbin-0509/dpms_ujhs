@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>스마트 비밀번호 관리 프로그램</title>
+
+<style>
+
+body{
+    font-family:Arial;
+    background:#eef3f8;
+    text-align:center;
+    padding:40px;
+}
+
+.box{
+    background:white;
+    width:450px;
+    margin:auto;
+    padding:30px;
+    border-radius:15px;
+    box-shadow:0 0 10px gray;
+}
+
+input{
+    width:90%;
+    padding:12px;
+    margin:8px;
+    font-size:16px;
+}
+
+button{
+    padding:10px 15px;
+    margin:5px;
+    border:0;
+    border-radius:8px;
+    background:#3478f6;
+    color:white;
+    cursor:pointer;
+}
+
+button:hover{
+    background:#245dcc;
+}
+
+.save{
+    background:#28a745;
+}
+
+.delete{
+    background:#dc3545;
+}
+
+#result{
+    margin-top:20px;
+    font-weight:bold;
+}
+
+#savedBox{
+    margin-top:20px;
+    background:#f2f2f2;
+    padding:15px;
+    border-radius:10px;
+}
+
+.passwordItem{
+    background:white;
+    padding:10px;
+    margin:8px;
+    border-radius:8px;
+}
+
+</style>
+
+</head>
+
+
+<body>
+
+
+<div class="box">
+
+
+<h2>🔒 스마트 비밀번호 관리 프로그램</h2>
+
+
+<input id="password"
+type="password"
+placeholder="비밀번호 입력">
+
+
+<br>
+
+
+<button onclick="checkPassword()">
+안전도 검사
+</button>
+
+
+<button onclick="makePassword()">
+랜덤 생성
+</button>
+
+
+<button onclick="copyPassword()">
+📋 복사
+</button>
+
+
+<hr>
+
+
+<h3>⭐ 나만의 비밀번호 생성</h3>
+
+
+<input id="initial"
+placeholder="이니셜 입력 (예: KJ)">
+
+
+<input id="birth"
+placeholder="생일 입력 (예: 0325)">
+
+
+<button onclick="makeMyPassword()">
+맞춤 생성
+</button>
+
+
+<br>
+
+
+<button id="saveBtn"
+class="save"
+onclick="savePassword()"
+style="display:none">
+
+비밀번호 저장
+
+</button>
+
+
+<button onclick="showSaved()">
+저장된 비밀번호
+</button>
+
+
+
+<div id="result"></div>
+
+
+
+<div id="savedBox" style="display:none">
+
+<h3>📁 저장 목록</h3>
+
+<div id="savedList"></div>
+
+<div id="view"></div>
+
+</div>
+
+
+</div>
+
+
+
+
+<script>
+
+
+let score=0;
+
+let lastPassword="";
+
+let savedPasswords=[];
+
+
+
+// 안전도 검사
+
+function checkPassword(){
+
+
+let pw =
+document.getElementById("password").value;
+
+
+lastPassword=pw;
+
+score=0;
+
+let warning="";
+
+
+
+if(pw.length>=8)
+score+=25;
+
+
+if(/[A-Z]/.test(pw))
+score+=25;
+
+
+if(/[0-9]/.test(pw))
+score+=25;
+
+
+if(/[!@#$%^&*]/.test(pw))
+score+=25;
+
+
+
+let easy=[
+"123456",
+"12345678",
+"password",
+"qwerty",
+"abc123",
+"111111"
+];
+
+
+if(easy.includes(pw.toLowerCase())){
+
+warning+="⚠️ 흔한 비밀번호입니다.<br>";
+
+score-=30;
+
+}
+
+
+
+if(/(.)\1{3,}/.test(pw)){
+
+warning+="⚠️ 같은 문자가 반복됩니다.<br>";
+
+score-=20;
+
+}
+
+
+
+if(pw.includes("1234")
+|| pw.includes("abcd")){
+
+warning+="⚠️ 예측하기 쉬운 순서입니다.<br>";
+
+score-=20;
+
+}
+
+
+
+if(score<0)
+score=0;
+
+
+
+let result=
+document.getElementById("result");
+
+
+result.innerHTML=
+"🔍 안전도 : "+score+"점<br><br>"+
+warning;
+
+
+
+if(score>=50){
+
+result.innerHTML+="✅ 저장 가능한 비밀번호";
+
+result.style.color="green";
+
+document.getElementById("saveBtn")
+.style.display="inline-block";
+
+}
+
+else{
+
+result.innerHTML+="❌ 저장 불가능한 비밀번호";
+
+result.style.color="red";
+
+document.getElementById("saveBtn")
+.style.display="none";
+
+}
+
+
+}
+
+
+
+// 기억하기 쉬운 랜덤 생성
+
+function makePassword(){
+
+
+let words=[
+"Apple",
+"Blue",
+"Star",
+"Moon",
+"Tree"
+];
+
+
+let word=
+words[Math.floor(Math.random()*words.length)];
+
+
+let num=
+Math.floor(100+Math.random()*900);
+
+
+let symbol=[
+"!",
+"@",
+"#"
+];
+
+
+let s=
+symbol[Math.floor(Math.random()*symbol.length)];
+
+
+let pw=
+word+num+s;
+
+
+
+document.getElementById("password")
+.value=pw;
+
+
+
+document.getElementById("result")
+.innerHTML=
+"🎲 추천 비밀번호<br><br><b>"
++pw+
+"</b><br>안전도 검사를 눌러주세요.";
+
+}
+
+
+
+// 이니셜+생일 생성
+
+function makeMyPassword(){
+
+
+let initial=
+document.getElementById("initial").value;
+
+
+let birth=
+document.getElementById("birth").value;
+
+
+
+if(initial=="" || birth==""){
+
+alert("이니셜과 생일을 입력하세요.");
+
+return;
+
+}
+
+
+
+let pw=
+initial.toUpperCase()
++
+birth
++
+"!"
++
+"a";
+
+
+
+document.getElementById("password")
+.value=pw;
+
+
+
+document.getElementById("result")
+.innerHTML=
+"⭐ 맞춤형 비밀번호<br><br><b>"
++pw+
+"</b><br>안전도 검사를 눌러주세요.";
+
+}
+
+
+
+
+// 복사
+
+function copyPassword(){
+
+
+let pw=
+document.getElementById("password").value;
+
+
+navigator.clipboard.writeText(pw);
+
+
+alert("복사 완료!");
+
+}
+
+
+
+// 저장
+
+function savePassword(){
+
+
+savedPasswords.push(lastPassword);
+
+
+alert("저장 완료!");
+
+}
+
+
+
+
+// 저장 목록 보기
+
+function showSaved(){
+
+
+document.getElementById("savedBox")
+.style.display="block";
+
+
+let html="";
+
+
+savedPasswords.forEach(function(pw,index){
+
+
+html+=
+
+"<div class='passwordItem'>"+
+"🔑 비밀번호 "+(index+1)+"<br>"+
+"<button onclick='viewPassword("+index+")'>보기</button>"+
+"<button class='delete' onclick='deletePassword("+index+")'>삭제</button>"+
+"</div>";
+
+
+});
+
+
+
+if(html=="")
+html="저장된 비밀번호 없음";
+
+
+document.getElementById("savedList")
+.innerHTML=html;
+
+
+}
+
+
+
+// 보기
+
+function viewPassword(index){
+
+
+document.getElementById("view")
+.innerHTML=
+
+"🔓 비밀번호<br><b>"
++
+savedPasswords[index]
++
+"</b>";
+
+}
+
+
+
+// 삭제
+
+function deletePassword(index){
+
+savedPasswords.splice(index,1);
+
+showSaved();
+
+}
+
+
+</script>
+
+
+</body>
+</html>
